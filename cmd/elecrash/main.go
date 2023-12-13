@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"strconv"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/lovromazgon/elecrash"
@@ -39,6 +40,14 @@ func main() {
 			game.Left()
 		case "<Right>":
 			game.Right()
+		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+			floor, err := strconv.Atoi(e.ID)
+			if err != nil {
+				panic(err)
+			}
+			game.ToFloor(floor)
+		case "G", "g":
+			game.ToFloor(0)
 		case "q":
 			return
 		}

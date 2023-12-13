@@ -10,6 +10,7 @@ import (
 type Elecrash struct {
 	bg        *Background
 	elevators []*Elevator
+	movers    []*Mover
 	selected  int
 	sync.Mutex
 }
@@ -24,6 +25,7 @@ func NewElecrash(elevators, floors int) *Elecrash {
 	return &Elecrash{
 		bg:        bg,
 		elevators: e,
+		movers:    make([]*Mover, elevators),
 	}
 }
 
@@ -63,4 +65,23 @@ func (e *Elecrash) Right() {
 	e.elevators[e.selected].Deselect()
 	e.selected += 1
 	e.elevators[e.selected].Select()
+}
+
+func (e *Elecrash) ToFloor(floor int) {
+	e.Lock()
+	defer e.Unlock()
+	if e.movers[e.selected] != nil {
+		return // can't override mover
+	}
+	if e.elevators[e.selected].Floor() == floor {
+		return // nothing to move
+	}
+
+	m := NewMover(e.elevators[e.selected], floor, &e.Mutex, func(_ bool) {
+		e.Lock()
+		defer e.Unlock()
+		e.movers[e.selected] = nil
+	})
+	m.Start()
+	e.movers[e.selected] = m
 }
