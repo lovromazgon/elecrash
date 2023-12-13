@@ -27,12 +27,20 @@ func main() {
 	}
 	defer ui.Close()
 
-	b := elecrash.NewBackground(*elevators, *floors)
-	ui.Render(b)
+	game := elecrash.NewElecrash(*elevators, *floors)
+	go game.Run()
 
 	for e := range ui.PollEvents() {
-		if e.Type == ui.KeyboardEvent {
-			break
+		if e.Type != ui.KeyboardEvent {
+			continue
+		}
+		switch e.ID {
+		case "<Left>":
+			game.Left()
+		case "<Right>":
+			game.Right()
+		case "q":
+			return
 		}
 	}
 }
