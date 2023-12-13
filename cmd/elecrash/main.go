@@ -28,6 +28,9 @@ func main() {
 	}
 	defer ui.Close()
 
+	closeLogger := elecrash.InitLogger()
+	defer closeLogger()
+
 	game := elecrash.NewElecrash(*elevators, *floors)
 	go game.Run()
 

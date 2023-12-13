@@ -4,19 +4,19 @@ import (
 	"sync"
 	"time"
 
-	ui "github.com/gizak/termui/v3"
+	"github.com/gizak/termui/v3"
+	"github.com/lovromazgon/elecrash/ui"
 )
 
 type Elecrash struct {
-	bg        *Background
+	bg        *ui.Background
 	elevators []*Elevator
-	movers    []*Mover
 	selected  int
 	sync.Mutex
 }
 
 func NewElecrash(elevators, floors int) *Elecrash {
-	bg := NewBackground(elevators, floors)
+	bg := ui.NewBackground(elevators, floors)
 	e := make([]*Elevator, elevators)
 	for i := range e {
 		e[i] = NewElevator(i, floors)
@@ -25,12 +25,11 @@ func NewElecrash(elevators, floors int) *Elecrash {
 	return &Elecrash{
 		bg:        bg,
 		elevators: e,
-		movers:    make([]*Mover, elevators),
 	}
 }
 
 func (e *Elecrash) Run() {
-	ui.Render(e.bg)
+	termui.Render(e.bg)
 	e.Render()
 	for range time.NewTicker(time.Millisecond * 100).C {
 		e.Render()
@@ -41,7 +40,7 @@ func (e *Elecrash) Render() {
 	e.Lock()
 	defer e.Unlock()
 	for _, e := range e.elevators {
-		ui.Render(e)
+		e.Render()
 	}
 }
 
@@ -70,18 +69,6 @@ func (e *Elecrash) Right() {
 func (e *Elecrash) ToFloor(floor int) {
 	e.Lock()
 	defer e.Unlock()
-	if e.movers[e.selected] != nil {
-		return // can't override mover
-	}
-	if e.elevators[e.selected].Floor() == floor {
-		return // nothing to move
-	}
 
-	m := NewMover(e.elevators[e.selected], floor, &e.Mutex, func(_ bool) {
-		e.Lock()
-		defer e.Unlock()
-		e.movers[e.selected] = nil
-	})
-	m.Start()
-	e.movers[e.selected] = m
+	e.elevators[e.selected].Move(floor)
 }

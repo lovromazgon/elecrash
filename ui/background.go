@@ -1,4 +1,4 @@
-package elecrash
+package ui
 
 import (
 	"image"

@@ -1,4 +1,4 @@
-package elecrash
+package ui
 
 var brailleRunes = [4][2]rune{
 	{'\u2801', '\u2808'},
