@@ -15,6 +15,13 @@ func main() {
 	)
 	flag.Parse()
 
+	if *elevators < 2 || *elevators > 10 {
+		log.Fatal("need between 2 and 10 elevators")
+	}
+	if *floors < 4 || *floors > 10 {
+		log.Fatal("need between 4 and 10 floors")
+	}
+
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}

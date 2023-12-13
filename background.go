@@ -42,10 +42,13 @@ func NewBackground(elevators, floors int) *Background {
 func (b *Background) Draw(buf *ui.Buffer) {
 	b.Block.Draw(buf)
 
-	// verticalCell := ui.Cell{ui.VERTICAL_LINE, b.BorderStyle}
+	verticalCell := ui.Cell{ui.VERTICAL_LINE, b.BorderStyle}
 	horizontalCell := ui.Cell{ui.HORIZONTAL_LINE, b.BorderStyle}
 	verticalRightCell := ui.Cell{ui.VERTICAL_RIGHT, b.BorderStyle}
 	verticalLeftCell := ui.Cell{ui.VERTICAL_LEFT, b.BorderStyle}
+	horizontalDownCell := ui.Cell{ui.HORIZONTAL_DOWN, b.BorderStyle}
+	horizontalUpCell := ui.Cell{ui.HORIZONTAL_UP, b.BorderStyle}
+	crossCell := ui.Cell{'┼', b.BorderStyle}
 
 	rect := b.Block.GetRect()
 
@@ -69,6 +72,16 @@ func (b *Background) Draw(buf *ui.Buffer) {
 		// right side
 		buf.SetCell(verticalLeftCell, image.Pt(rect.Max.X-1, rect.Min.Y+5+(2*i)))
 		buf.SetCell(ui.NewCell(floor), image.Pt(rect.Max.X-3, rect.Min.Y+5+(2*i)))
+	}
+
+	// elevators
+	for i := 0; i <= b.elevators; i++ {
+		buf.SetCell(horizontalDownCell, image.Pt(rect.Min.X+4+(6*i), rect.Min.Y))
+		buf.Fill(verticalCell, image.Rect(rect.Min.X+4+(6*i), rect.Min.Y+1, rect.Min.X+4+(6*i)+1, rect.Max.Y-1))
+		buf.SetCell(horizontalUpCell, image.Pt(rect.Min.X+4+(6*i), rect.Max.Y-1))
+		for j := 0; j <= b.floors; j++ {
+			buf.SetCell(crossCell, image.Pt(rect.Min.X+4+(6*i), rect.Min.Y+3+(2*j)))
+		}
 	}
 }
 
