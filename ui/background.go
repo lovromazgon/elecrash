@@ -2,14 +2,14 @@ package ui
 
 import (
 	"image"
-	"strconv"
 
 	ui "github.com/gizak/termui/v3"
 )
 
 const (
-	elevatorWidth = 5
+	upDownWidth   = 3
 	floorWidth    = 3
+	elevatorWidth = 5
 )
 
 type Background struct {
@@ -24,7 +24,8 @@ func NewBackground(elevators, floors int) *Background {
 		panic("we need at least 2 elevators and 4 floors")
 	}
 
-	width := (floorWidth+2)*2 +
+	width := (upDownWidth+2)*2 +
+		(floorWidth+1)*2 +
 		((elevatorWidth + 1) * elevators) - 1
 	height := 4 + 2*floors + 2
 
@@ -57,30 +58,40 @@ func (b *Background) Draw(buf *ui.Buffer) {
 	buf.Fill(horizontalCell, image.Rect(rect.Min.X+1, rect.Min.Y+3, rect.Max.X-1, rect.Min.Y+4))
 	buf.SetCell(verticalLeftCell, image.Pt(rect.Max.X-1, rect.Min.Y+3))
 
+	// up/down
+	for i, c := range []rune("UP↑") {
+		buf.SetCell(ui.NewCell(c), image.Pt(rect.Min.X+1+i, rect.Min.Y+1))
+	}
+	for i, c := range []rune("DN↓") {
+		buf.SetCell(ui.NewCell(c), image.Pt(rect.Max.X-4+i, rect.Min.Y+1))
+	}
+
 	// floors
-	buf.SetCell(ui.NewCell('F'), image.Pt(rect.Min.X+2, rect.Min.Y+1))
-	buf.SetCell(ui.NewCell('F'), image.Pt(rect.Max.X-3, rect.Min.Y+1))
+	buf.SetCell(ui.NewCell('F'), image.Pt(rect.Min.X+3+upDownWidth, rect.Min.Y+1))
+	buf.SetCell(ui.NewCell('F'), image.Pt(rect.Max.X-4-upDownWidth, rect.Min.Y+1))
 	for i := 0; i < b.floors; i++ {
-		floor := rune(strconv.Itoa(b.floors - 1 - i)[0])
-		if floor == '0' {
-			floor = 'G'
-		}
+		floor := floorToRune(b.floors - 1 - i)
 		// left side
 		buf.SetCell(verticalRightCell, image.Pt(rect.Min.X, rect.Min.Y+5+(2*i)))
-		buf.SetCell(ui.NewCell(floor), image.Pt(rect.Min.X+2, rect.Min.Y+5+(2*i)))
+		buf.SetCell(ui.NewCell(floor), image.Pt(rect.Min.X+3+upDownWidth, rect.Min.Y+5+(2*i)))
 
 		// right side
 		buf.SetCell(verticalLeftCell, image.Pt(rect.Max.X-1, rect.Min.Y+5+(2*i)))
-		buf.SetCell(ui.NewCell(floor), image.Pt(rect.Max.X-3, rect.Min.Y+5+(2*i)))
+		buf.SetCell(ui.NewCell(floor), image.Pt(rect.Max.X-4-upDownWidth, rect.Min.Y+5+(2*i)))
 	}
 
-	// elevators
+	// vertical lines
+	lineOffsets := []int{floorWidth + 1, rect.Max.X - floorWidth - 2}
 	for i := 0; i <= b.elevators; i++ {
-		buf.SetCell(horizontalDownCell, image.Pt(rect.Min.X+4+(6*i), rect.Min.Y))
-		buf.Fill(verticalCell, image.Rect(rect.Min.X+4+(6*i), rect.Min.Y+1, rect.Min.X+4+(6*i)+1, rect.Max.Y-1))
-		buf.SetCell(horizontalUpCell, image.Pt(rect.Min.X+4+(6*i), rect.Max.Y-1))
+		lineOffsets = append(lineOffsets, rect.Min.X+upDownWidth+floorWidth+2+(6*i))
+	}
+
+	for _, offset := range lineOffsets {
+		buf.SetCell(horizontalDownCell, image.Pt(offset, rect.Min.Y))
+		buf.Fill(verticalCell, image.Rect(offset, rect.Min.Y+1, offset+1, rect.Max.Y-1))
+		buf.SetCell(horizontalUpCell, image.Pt(offset, rect.Max.Y-1))
 		for j := 0; j <= b.floors; j++ {
-			buf.SetCell(crossCell, image.Pt(rect.Min.X+4+(6*i), rect.Min.Y+3+(2*j)))
+			buf.SetCell(crossCell, image.Pt(offset, rect.Min.Y+3+(2*j)))
 		}
 	}
 }

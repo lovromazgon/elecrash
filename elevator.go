@@ -88,15 +88,15 @@ func (m *Elevator) Move(floor int) {
 		logger.Info("can't move if not idle", "state", m.state)
 		return
 	}
-	if m.uiElevator.Floor() == floor {
-		logger.Info("nothing to move", "floor", floor)
-		return
-	}
 
-	logger.Info("elevator moving")
 	m.state = Moving
 	m.targetFloor = floor
-	m.uiElevator.ShowMoving(m.targetFloor - m.uiElevator.Floor())
+
+	if m.uiElevator.Floor() != floor {
+		logger.Info("elevator moving")
+		m.uiElevator.ShowMoving(m.targetFloor)
+	}
+
 	go m.tickMove()
 }
 

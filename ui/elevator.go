@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 
 	ui "github.com/gizak/termui/v3"
@@ -15,6 +16,7 @@ type Elevator struct {
 	maxFloor int
 	dirty    bool
 
+	state  string
 	action []rune
 }
 
@@ -22,21 +24,20 @@ var _ ui.Drawable = (*Elevator)(nil)
 
 func NewElevator(lane int, maxFloor int) *Elevator {
 	b := ui.NewBlock()
-
-	// init position on ground floor
 	b.SetRect(
-		5+(lane*6),
-		4,
-		5+(lane*6)+elevatorWidth,
+		upDownWidth+floorWidth+3+(lane*6),
+		1,
+		upDownWidth+floorWidth+3+(lane*6)+elevatorWidth,
 		4+(maxFloor-1)*2+3,
 	)
 	b.Border = false
 
+	// init position on ground floor
 	elevatorBlock := ui.NewBlock()
 	elevatorBlock.SetRect(
-		5+(lane*6),
+		upDownWidth+floorWidth+3+(lane*6),
 		4+(maxFloor-1)*2,
-		5+(lane*6)+elevatorWidth,
+		upDownWidth+floorWidth+3+(lane*6)+elevatorWidth,
 		4+(maxFloor-1)*2+3,
 	)
 
@@ -46,6 +47,7 @@ func NewElevator(lane int, maxFloor int) *Elevator {
 		floor:         0,
 		maxFloor:      maxFloor,
 		elevatorBlock: *elevatorBlock,
+		dirty:         true,
 	}
 }
 
@@ -76,7 +78,12 @@ func (e *Elevator) Deselect() {
 func (e *Elevator) Draw(buf *ui.Buffer) {
 	if e.dirty {
 		// redraw lane
+		rect := e.Block.GetRect()
 		e.Block.Draw(buf)
+		buf.Fill(
+			ui.Cell{ui.HORIZONTAL_LINE, e.Block.BorderStyle},
+			image.Rect(rect.Min.X, rect.Min.Y+2, rect.Max.X+1, rect.Min.Y+3),
+		)
 	}
 	e.elevatorBlock.Draw(buf)
 
@@ -88,6 +95,11 @@ func (e *Elevator) Draw(buf *ui.Buffer) {
 		buf.SetCell(ui.NewCell(e.action[1]), image.Pt(rect.Max.X-2, rect.Max.Y-2))
 	}
 
+	// draw state
+	for i, c := range []rune(e.state) {
+		buf.SetCell(ui.NewCell(c), image.Pt(rect.Min.X+i, 1))
+	}
+
 	// TODO draw people
 
 }
@@ -96,26 +108,31 @@ func (e *Elevator) ShowOpening() {
 	e.Lock()
 	defer e.Unlock()
 	e.action = []rune{'<', '>'}
+	e.state = " OPN "
 }
 
 func (e *Elevator) ShowClosing() {
 	e.Lock()
 	defer e.Unlock()
 	e.action = []rune{'>', '<'}
+	e.state = " CLS "
 }
 
 func (e *Elevator) ShowIdle() {
 	e.Lock()
 	defer e.Unlock()
 	e.action = nil
+	e.state = "     "
 }
 
-func (e *Elevator) ShowMoving(move int) {
+func (e *Elevator) ShowMoving(targetFloor int) {
 	e.Lock()
 	defer e.Unlock()
-	if move > 0 {
+	if e.floor < targetFloor {
 		e.action = []rune{'↑', '↑'}
+		e.state = fmt.Sprintf(" ↑%c  ", floorToRune(targetFloor))
 	} else {
 		e.action = []rune{'↓', '↓'}
+		e.state = fmt.Sprintf(" ↓%c  ", floorToRune(targetFloor))
 	}
 }
