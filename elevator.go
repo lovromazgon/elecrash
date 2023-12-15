@@ -157,7 +157,8 @@ func (e *Elevator) UnloadPeople() []*Person {
 		e.people[i] = e.people[len(e.people)-1]
 		e.people = e.people[:len(e.people)-1]
 	}
-	e.uiElevator.SetPeople(len(e.people))
+	e.updateElevatorUI()
+
 	return people
 }
 
@@ -169,5 +170,14 @@ func (e *Elevator) LoadPeople(people []*Person) {
 		panic("tried to load more people than allowed into elevator")
 	}
 	e.people = append(e.people, people...)
+	e.updateElevatorUI()
+}
+
+func (e *Elevator) updateElevatorUI() {
+	targetFloors := make([]int, len(e.people))
+	for i, p := range e.people {
+		targetFloors[i] = p.targetFloor
+	}
 	e.uiElevator.SetPeople(len(e.people))
+	e.uiElevator.SetTargetFloors(targetFloors)
 }

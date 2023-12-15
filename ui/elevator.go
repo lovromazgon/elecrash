@@ -11,11 +11,12 @@ type Elevator struct {
 	ui.Block
 	elevatorBlock ui.Block
 
-	lane     int
-	floor    int
-	maxFloor int
-	dirty    bool
-	people   int
+	lane         int
+	floor        int
+	maxFloor     int
+	dirty        bool
+	people       int
+	targetFloors []int
 
 	state  string
 	action []rune
@@ -85,6 +86,11 @@ func (e *Elevator) Draw(buf *ui.Buffer) {
 			ui.Cell{ui.HORIZONTAL_LINE, e.Block.BorderStyle},
 			image.Rect(rect.Min.X, rect.Min.Y+2, rect.Max.X+1, rect.Min.Y+3),
 		)
+
+		// draw target floors
+		for _, floor := range e.targetFloors {
+			buf.SetCell(ui.NewCell('◆'), image.Pt(rect.Min.X+(elevatorWidth/2), rect.Max.Y-2-(floor*2)))
+		}
 	}
 	e.elevatorBlock.Draw(buf)
 
@@ -142,4 +148,11 @@ func (e *Elevator) SetPeople(people int) {
 	e.Lock()
 	defer e.Unlock()
 	e.people = people
+}
+
+func (e *Elevator) SetTargetFloors(targetFloors []int) {
+	e.Lock()
+	defer e.Unlock()
+	e.targetFloors = targetFloors
+	e.dirty = true
 }
