@@ -25,6 +25,13 @@ type Elecrash struct {
 	r                *rand.Rand
 	spawnProbability float64
 
+	totalLoaded         int
+	totalRides          int
+	averageWaitDuration time.Duration
+	averageRideDuration time.Duration
+
+	score *ui.Score
+
 	sync.Mutex
 }
 
@@ -40,6 +47,7 @@ func NewElecrash(elevators, floors int, spawnRatePerSecond float64) *Elecrash {
 		peopleUp:         ui.NewPeople(floors, 2),
 		peopleDown:       ui.NewPeople(floors, bg.GetRect().Max.X-3),
 		spawnProbability: spawnRatePerSecond * renderTick.Seconds(),
+		score:            ui.NewScore(elevators, floors),
 	}
 
 	e := make([]*Elevator, elevators)
@@ -53,6 +61,7 @@ func NewElecrash(elevators, floors int, spawnRatePerSecond float64) *Elecrash {
 
 func (e *Elecrash) Run() {
 	termui.Render(e.bg)
+	termui.Render(e.score)
 	e.Render()
 	for range time.NewTicker(renderTick).C {
 		if f := e.r.Float64(); f < e.spawnProbability {
@@ -154,8 +163,6 @@ func (e *Elecrash) LoadPeople(elv *Elevator) {
 			if len(people) == limit {
 				break // can't load more people
 			}
-		} else {
-			logger.Info("NOPEEE", "current", p.currentFloor, "target", elv.targetFloor)
 		}
 	}
 
@@ -167,14 +174,21 @@ func (e *Elecrash) LoadPeople(elv *Elevator) {
 	loadTime := time.Now()
 
 	slices.Reverse(loaded)
+	var waitDurationTotal time.Duration
 	for _, i := range loaded {
 		e.waitingPeople[i].ridingTime = loadTime
+		waitDurationTotal += e.waitingPeople[i].ridingTime.Sub(e.waitingPeople[i].waitingTime)
+
 		e.waitingPeople[i] = e.waitingPeople[len(e.waitingPeople)-1]
 		e.waitingPeople = e.waitingPeople[:len(e.waitingPeople)-1]
 	}
 
 	e.peopleUp.Add(elv.targetFloor, -goingUp)
 	e.peopleDown.Add(elv.targetFloor, -goingDown)
+
+	e.averageWaitDuration = time.Duration(float64((e.averageWaitDuration*time.Duration(e.totalLoaded))+waitDurationTotal) / float64(e.totalLoaded+len(loaded)))
+	e.totalLoaded += len(loaded)
+	e.updateScore()
 
 	logger.Info("loaded people into elevator", "lane", elv.lane, "goingUp", goingUp, "goingDown", goingDown)
 }
@@ -189,10 +203,23 @@ func (e *Elecrash) UnloadPeople(elv *Elevator) {
 	}
 
 	unloadTime := time.Now()
+	var rideDurationTotal time.Duration
 	for _, p := range unloaded {
 		p.arrivedTime = unloadTime
+		rideDurationTotal += p.arrivedTime.Sub(p.ridingTime)
 	}
-	// TODO calculate score
+
+	e.averageRideDuration = time.Duration(float64((e.averageRideDuration*time.Duration(e.totalRides))+rideDurationTotal) / float64(e.totalRides+len(unloaded)))
+	e.totalRides += len(unloaded)
+	e.updateScore()
 
 	logger.Info("unloaded people from elevator", "lane", elv.lane, "total", len(unloaded))
+}
+
+func (e *Elecrash) updateScore() {
+	logger.Info("SCORE", "total rides", e.totalRides, "avg wait", e.averageRideDuration, "avg ride", e.averageRideDuration)
+	e.score.SetTotalRides(e.totalRides)
+	e.score.SetAverageWaitDuration(e.averageWaitDuration)
+	e.score.SetAverageRideDuration(e.averageRideDuration)
+	termui.Render(e.score)
 }
