@@ -7,6 +7,8 @@ A CLI game that requires you to manage a fleet of elevators.
 Build the game using `go build -o elecrash cmd/elecrash/main.go` and run the
 binary using `./elecrash`.
 
+Quit the game by pressing `q`.
+
 You can configure some aspects of the game:
 
 ```
