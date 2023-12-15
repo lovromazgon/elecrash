@@ -11,8 +11,9 @@ import (
 
 func main() {
 	var (
-		elevators = flag.Int("e", 4, "number of elevators")
-		floors    = flag.Int("f", 8, "number of floors")
+		elevators  = flag.Int("e", 4, "number of elevators")
+		floors     = flag.Int("f", 8, "number of floors")
+		difficulty = flag.Int("d", 1, "difficulty (1-10)")
 	)
 	flag.Parse()
 
@@ -21,6 +22,9 @@ func main() {
 	}
 	if *floors < 4 || *floors > 10 {
 		log.Fatal("need between 4 and 10 floors")
+	}
+	if *difficulty < 1 || *difficulty > 10 {
+		log.Fatal("need between 1 and 10 difficulty")
 	}
 
 	if err := ui.Init(); err != nil {
@@ -31,7 +35,7 @@ func main() {
 	closeLogger := elecrash.InitLogger()
 	defer closeLogger()
 
-	game := elecrash.NewElecrash(*elevators, *floors)
+	game := elecrash.NewElecrash(*elevators, *floors, float64(*difficulty))
 	go game.Run()
 
 	for e := range ui.PollEvents() {
@@ -39,9 +43,9 @@ func main() {
 			continue
 		}
 		switch e.ID {
-		case "<Left>":
+		case "<Left>", "h", "H":
 			game.Left()
-		case "<Right>":
+		case "<Right>", "l", "L":
 			game.Right()
 		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 			floor, err := strconv.Atoi(e.ID)

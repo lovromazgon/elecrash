@@ -1,6 +1,7 @@
 package elecrash
 
 import (
+	"slices"
 	"sync"
 	"time"
 
@@ -25,13 +26,16 @@ type Elevator struct {
 	lane        int
 	targetFloor int
 	state       ElevatorState
+	people      []*Person
 
 	uiElevator *ui.Elevator
+
+	game *Elecrash
 
 	sync.Mutex
 }
 
-func NewElevator(lane, maxFloor int) *Elevator {
+func NewElevator(game *Elecrash, lane, maxFloor int) *Elevator {
 	uiElevator := ui.NewElevator(lane, maxFloor)
 	if lane == 0 {
 		uiElevator.Select()
@@ -40,94 +44,130 @@ func NewElevator(lane, maxFloor int) *Elevator {
 		lane:        lane,
 		targetFloor: 0,
 		state:       Idle,
+		people:      make([]*Person, 0, maxPeople),
 
 		uiElevator: uiElevator,
+
+		game: game,
 	}
 }
 
-func (m *Elevator) Open() {
-	m.Lock()
-	defer m.Unlock()
-	if m.state != Idle {
-		logger.Info("can't open if not idle", "state", m.state)
+func (e *Elevator) Open() {
+	e.Lock()
+	defer e.Unlock()
+	if e.state != Idle {
+		logger.Info("can't open if not idle", "state", e.state)
 		return
 	}
 	logger.Info("elevator opening")
-	m.state = Opening
-	m.uiElevator.ShowOpening()
+	e.state = Opening
+	e.uiElevator.ShowOpening()
 	go func() {
-		<-time.Tick(time.Second)
-		// TODO load people
-		m.Close()
+		<-time.Tick(time.Second / 2)
+		e.game.UnloadPeople(e)
+		e.game.LoadPeople(e)
+		<-time.Tick(time.Second / 2)
+		e.Close()
 	}()
 }
 
-func (m *Elevator) Close() {
-	m.Lock()
-	defer m.Unlock()
-	if m.state != Opening {
-		logger.Info("can't close if not opening", "state", m.state)
+func (e *Elevator) Close() {
+	e.Lock()
+	defer e.Unlock()
+	if e.state != Opening {
+		logger.Info("can't close if not opening", "state", e.state)
 		return
 	}
 	logger.Info("elevator closing")
-	m.state = Closing
-	m.uiElevator.ShowClosing()
+	e.state = Closing
+	e.uiElevator.ShowClosing()
 	go func() {
 		<-time.Tick(time.Second)
-		m.Lock()
-		m.state = Idle
-		m.uiElevator.ShowIdle()
-		m.Unlock()
+		e.Lock()
+		e.state = Idle
+		e.uiElevator.ShowIdle()
+		e.Unlock()
 	}()
 }
 
-func (m *Elevator) Move(floor int) {
-	m.Lock()
-	defer m.Unlock()
-	if m.state != Idle {
-		logger.Info("can't move if not idle", "state", m.state)
+func (e *Elevator) Move(floor int) {
+	e.Lock()
+	defer e.Unlock()
+	if e.state != Idle {
+		logger.Info("can't move if not idle", "state", e.state)
 		return
 	}
 
-	m.state = Moving
-	m.targetFloor = floor
+	e.state = Moving
+	e.targetFloor = floor
 
-	if m.uiElevator.Floor() != floor {
+	if e.uiElevator.Floor() != floor {
 		logger.Info("elevator moving")
-		m.uiElevator.ShowMoving(m.targetFloor)
+		e.uiElevator.ShowMoving(e.targetFloor)
 	}
 
-	go m.tickMove()
+	go e.tickMove()
 }
 
-func (m *Elevator) tickMove() {
+func (e *Elevator) tickMove() {
 	move := 1 // move 1 floor up
-	if m.uiElevator.Floor() > m.targetFloor {
+	if e.uiElevator.Floor() > e.targetFloor {
 		move = -1
 	}
 
-	for m.uiElevator.Floor() != m.targetFloor {
+	for e.uiElevator.Floor() != e.targetFloor {
 		<-time.Tick(time.Second)
-		m.Lock()
-		m.uiElevator.SetFloor(m.uiElevator.Floor() + move)
-		m.Unlock()
+		e.Lock()
+		e.uiElevator.SetFloor(e.uiElevator.Floor() + move)
+		e.Unlock()
 	}
 
 	logger.Info("elevator idle")
-	m.Lock()
-	m.state = Idle
-	m.Unlock()
-	m.Open()
+	e.Lock()
+	e.state = Idle
+	e.Unlock()
+	e.Open()
 }
 
-func (m *Elevator) Render() {
-	termui.Render(m.uiElevator)
+func (e *Elevator) Render() {
+	termui.Render(e.uiElevator)
 }
 
-func (m *Elevator) Select() {
-	m.uiElevator.Select()
+func (e *Elevator) Select() {
+	e.uiElevator.Select()
 }
 
-func (m *Elevator) Deselect() {
-	m.uiElevator.Deselect()
+func (e *Elevator) Deselect() {
+	e.uiElevator.Deselect()
+}
+
+func (e *Elevator) UnloadPeople() []*Person {
+	e.Lock()
+	defer e.Unlock()
+	var unloaded []int
+	var people []*Person
+	for i, p := range e.people {
+		if p.targetFloor == e.targetFloor {
+			unloaded = append(unloaded, i)
+			people = append(people, p)
+		}
+	}
+	slices.Reverse(unloaded)
+	for _, i := range unloaded {
+		e.people[i] = e.people[len(e.people)-1]
+		e.people = e.people[:len(e.people)-1]
+	}
+	e.uiElevator.SetPeople(len(e.people))
+	return people
+}
+
+func (e *Elevator) LoadPeople(people []*Person) {
+	e.Lock()
+	defer e.Unlock()
+
+	if len(e.people)+len(people) > maxPeople {
+		panic("tried to load more people than allowed into elevator")
+	}
+	e.people = append(e.people, people...)
+	e.uiElevator.SetPeople(len(e.people))
 }

@@ -15,6 +15,7 @@ type Elevator struct {
 	floor    int
 	maxFloor int
 	dirty    bool
+	people   int
 
 	state  string
 	action []rune
@@ -92,7 +93,7 @@ func (e *Elevator) Draw(buf *ui.Buffer) {
 	// draw action
 	if len(e.action) > 1 {
 		buf.SetCell(ui.NewCell(e.action[0]), image.Pt(rect.Min.X+1, rect.Min.Y+1))
-		buf.SetCell(ui.NewCell(e.action[1]), image.Pt(rect.Max.X-2, rect.Max.Y-2))
+		buf.SetCell(ui.NewCell(e.action[1]), image.Pt(rect.Max.X-2, rect.Min.Y+1))
 	}
 
 	// draw state
@@ -100,8 +101,8 @@ func (e *Elevator) Draw(buf *ui.Buffer) {
 		buf.SetCell(ui.NewCell(c), image.Pt(rect.Min.X+i, 1))
 	}
 
-	// TODO draw people
-
+	// draw people
+	buf.SetCell(ui.NewCell(Braille(e.people)), image.Pt(rect.Min.X+(elevatorWidth/2), rect.Min.Y+1))
 }
 
 func (e *Elevator) ShowOpening() {
@@ -135,4 +136,10 @@ func (e *Elevator) ShowMoving(targetFloor int) {
 		e.action = []rune{'↓', '↓'}
 		e.state = fmt.Sprintf(" ↓%c  ", floorToRune(targetFloor))
 	}
+}
+
+func (e *Elevator) SetPeople(people int) {
+	e.Lock()
+	defer e.Unlock()
+	e.people = people
 }

@@ -7,14 +7,17 @@ var brailleRunes = [4][2]rune{
 	{'\u2840', '\u2880'},
 }
 
-// Braille builds a braille rune given the pairs that represent coordinates
-// (row x column). There are 4 rows and 2 columns.
-func Braille(pairs ...int) rune {
+// Braille builds a braille rune given the number.
+func Braille(amount int) rune {
+	if amount == 0 {
+		return ' '
+	}
+	if amount < 0 || amount > 8 {
+		panic("can only draw between 0 and 8 dots")
+	}
 	var r rune
-	for i := 0; i < len(pairs); i = i + 2 {
-		x := pairs[i]
-		y := pairs[i+1]
-		r |= brailleRunes[x][y]
+	for i := 0; i < amount; i++ {
+		r |= brailleRunes[i/2][i%2]
 	}
 	return r
 }

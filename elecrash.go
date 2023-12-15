@@ -1,6 +1,8 @@
 package elecrash
 
 import (
+	"math/rand"
+	"slices"
 	"sync"
 	"time"
 
@@ -8,32 +10,85 @@ import (
 	"github.com/lovromazgon/elecrash/ui"
 )
 
+const renderTick = time.Millisecond * 100
+
 type Elecrash struct {
 	bg        *ui.Background
 	elevators []*Elevator
+	floors    int
 	selected  int
+
+	waitingPeople []*Person
+	peopleUp      *ui.People
+	peopleDown    *ui.People
+
+	r                *rand.Rand
+	spawnProbability float64
+
 	sync.Mutex
 }
 
-func NewElecrash(elevators, floors int) *Elecrash {
+func NewElecrash(elevators, floors int, spawnRatePerSecond float64) *Elecrash {
 	bg := ui.NewBackground(elevators, floors)
-	e := make([]*Elevator, elevators)
-	for i := range e {
-		e[i] = NewElevator(i, floors)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	elecrash := &Elecrash{
+		bg:               bg,
+		floors:           floors,
+		r:                r,
+		waitingPeople:    make([]*Person, 0),
+		peopleUp:         ui.NewPeople(floors, 2),
+		peopleDown:       ui.NewPeople(floors, bg.GetRect().Max.X-3),
+		spawnProbability: spawnRatePerSecond * renderTick.Seconds(),
 	}
 
-	return &Elecrash{
-		bg:        bg,
-		elevators: e,
+	e := make([]*Elevator, elevators)
+	for i := range e {
+		e[i] = NewElevator(elecrash, i, floors)
 	}
+
+	elecrash.elevators = e
+	return elecrash
 }
 
 func (e *Elecrash) Run() {
 	termui.Render(e.bg)
 	e.Render()
-	for range time.NewTicker(time.Millisecond * 100).C {
+	for range time.NewTicker(renderTick).C {
+		if f := e.r.Float64(); f < e.spawnProbability {
+			currentFloor := int((f / e.spawnProbability) * float64(e.floors))
+			targetFloor := currentFloor
+			for targetFloor == currentFloor {
+				// ensure we generate a target floor that is different than current floor
+				targetFloor = int(e.r.Float64() * float64(e.floors))
+			}
+			spawned := e.SpawnPerson(currentFloor, targetFloor)
+			if !spawned {
+				// TODO game over
+			}
+		}
 		e.Render()
 	}
+}
+
+func (e *Elecrash) SpawnPerson(currentFloor, targetFloor int) bool {
+	e.Lock()
+	defer e.Unlock()
+
+	spawned := false
+	if targetFloor > currentFloor {
+		spawned = e.peopleUp.Add(currentFloor, 1)
+	} else {
+		spawned = e.peopleDown.Add(currentFloor, 1)
+	}
+	if !spawned {
+		logger.Info("failed to spawn person", "currentFloor", currentFloor, "targetFloor", targetFloor)
+		return spawned
+	}
+
+	e.waitingPeople = append(e.waitingPeople, NewPerson(currentFloor, targetFloor))
+	logger.Info("spawned person", "currentFloor", currentFloor, "targetFloor", targetFloor)
+	return true
 }
 
 func (e *Elecrash) Render() {
@@ -42,6 +97,8 @@ func (e *Elecrash) Render() {
 	for _, e := range e.elevators {
 		e.Render()
 	}
+	termui.Render(e.peopleUp)
+	termui.Render(e.peopleDown)
 }
 
 func (e *Elecrash) Left() {
@@ -71,4 +128,71 @@ func (e *Elecrash) ToFloor(floor int) {
 	defer e.Unlock()
 
 	e.elevators[e.selected].Move(floor)
+}
+
+func (e *Elecrash) LoadPeople(elv *Elevator) {
+	e.Lock()
+	defer e.Unlock()
+
+	limit := maxPeople - len(elv.people)
+	if limit == 0 {
+		return // elevator is full
+	}
+	people := make([]*Person, 0, limit)
+	loaded := make([]int, 0, limit)
+	goingUp := 0
+	goingDown := 0
+	for i, p := range e.waitingPeople {
+		if p.currentFloor == elv.targetFloor {
+			people = append(people, p)
+			loaded = append(loaded, i)
+			if p.targetFloor > p.currentFloor {
+				goingUp += 1
+			} else {
+				goingDown += 1
+			}
+			if len(people) == limit {
+				break // can't load more people
+			}
+		} else {
+			logger.Info("NOPEEE", "current", p.currentFloor, "target", elv.targetFloor)
+		}
+	}
+
+	if len(people) == 0 {
+		return
+	}
+
+	elv.LoadPeople(people)
+	loadTime := time.Now()
+
+	slices.Reverse(loaded)
+	for _, i := range loaded {
+		e.waitingPeople[i].ridingTime = loadTime
+		e.waitingPeople[i] = e.waitingPeople[len(e.waitingPeople)-1]
+		e.waitingPeople = e.waitingPeople[:len(e.waitingPeople)-1]
+	}
+
+	e.peopleUp.Add(elv.targetFloor, -goingUp)
+	e.peopleDown.Add(elv.targetFloor, -goingDown)
+
+	logger.Info("loaded people into elevator", "lane", elv.lane, "goingUp", goingUp, "goingDown", goingDown)
+}
+
+func (e *Elecrash) UnloadPeople(elv *Elevator) {
+	e.Lock()
+	defer e.Unlock()
+
+	unloaded := elv.UnloadPeople()
+	if len(unloaded) == 0 {
+		return
+	}
+
+	unloadTime := time.Now()
+	for _, p := range unloaded {
+		p.arrivedTime = unloadTime
+	}
+	// TODO calculate score
+
+	logger.Info("unloaded people from elevator", "lane", elv.lane, "total", len(unloaded))
 }
