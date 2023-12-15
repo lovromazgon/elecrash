@@ -73,7 +73,9 @@ func (e *Elecrash) Run() {
 			}
 			spawned := e.SpawnPerson(currentFloor, targetFloor)
 			if !spawned {
-				// TODO game over
+				// game over
+				ui.RenderGameOver(e.bg.GetRect())
+				return
 			}
 		}
 		e.Render()
